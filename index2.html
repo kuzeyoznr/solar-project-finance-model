@@ -1,0 +1,320 @@
+<title>Sunfield Solar PF Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500;75..100,700&family=Source+Sans+3:wght@400;600&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: workbook window. Title band, formula bar, sheet area, sheet tabs at the bottom. Banking colour convention: blue = hardcoded input, black = calculation */
+:root{
+  --bg:#e9ecef; --sheet:#ffffff; --grid:#d5dade; --head:#f1f3f5; --fg:#16202a; --muted:#66727e;
+  --band:#1f3a52; --band-fg:#f2f5f8; --input:#0b3fd6; --input-bg:#fff8d6; --sel:#1f3a52;
+  --debt:#1f3a52; --eq:#c97a10; --good:#1e7a46; --bad:#b3362a;
+  --hd:"Archivo", "Arial Narrow", Arial, sans-serif;
+  --tx:"Source Sans 3", Calibri, "Segoe UI", sans-serif;
+  --nm:"Roboto Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1419; --sheet:#171d23; --grid:#2a333c; --head:#1d252d; --fg:#e4e9ee; --muted:#93a0ac;
+  --band:#132636; --band-fg:#e4ecf3; --input:#7ea6ff; --input-bg:#2a2814; --sel:#7ea6ff;
+  --debt:#6f97b8; --eq:#e8a23f; --good:#56c085; --bad:#ec7a6c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1419; --sheet:#171d23; --grid:#2a333c; --head:#1d252d; --fg:#e4e9ee; --muted:#93a0ac;
+  --band:#132636; --band-fg:#e4ecf3; --input:#7ea6ff; --input-bg:#2a2814; --sel:#7ea6ff;
+  --debt:#6f97b8; --eq:#e8a23f; --good:#56c085; --bad:#ec7a6c; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--tx);font-size:14px}
+.wb{max-width:1280px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.win{border:1px solid var(--grid);background:var(--sheet);box-shadow:0 1px 0 var(--grid)}
+.band{background:var(--band);color:var(--band-fg);padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;align-items:center}
+.band h1{font-family:var(--hd);font-stretch:80%;font-weight:700;font-size:22px;letter-spacing:.01em;margin:0}
+.band .meta{font-family:var(--nm);font-size:11px;opacity:.8;display:flex;gap:16px;flex-wrap:wrap}
+.scen{display:flex;gap:0;border:1px solid color-mix(in srgb,var(--band-fg) 40%,transparent);border-radius:3px;overflow:hidden}
+.scen button{background:transparent;color:var(--band-fg);border:0;border-right:1px solid color-mix(in srgb,var(--band-fg) 30%,transparent);font:600 12px var(--tx);padding:5px 12px;cursor:pointer}
+.scen button:last-child{border-right:0}
+.scen button[aria-pressed="true"]{background:var(--band-fg);color:var(--band)}
+.fbar{display:grid;grid-template-columns:64px 34px minmax(0,1fr);border-bottom:1px solid var(--grid);font-family:var(--nm);font-size:12px}
+.fbar>div{padding:6px 10px;border-right:1px solid var(--grid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbar .fx{font-style:italic;color:var(--muted);text-align:center;padding-inline:0}
+.fbar #fxText{border-right:0;white-space:normal}
+.sheet{padding:18px;display:none;gap:18px}
+.sheet.on{display:grid}
+.tabs{display:flex;gap:2px;background:var(--head);border-top:1px solid var(--grid);padding:0 8px;overflow-x:auto}
+.tabs button{font:600 12px var(--tx);color:var(--muted);background:transparent;border:0;border-top:3px solid transparent;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{background:var(--sheet);color:var(--fg);border-top-color:var(--eq)}
+button:focus-visible,input:focus-visible,.cell:focus-visible{outline:2px solid var(--sel);outline-offset:-2px}
+h2{font-family:var(--hd);font-stretch:85%;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px;color:var(--fg)}
+.dash{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:880px){.dash{grid-template-columns:1fr}}
+/* spreadsheet grid */
+.grid{border:1px solid var(--grid);overflow-x:auto}
+table.xl{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.xl th,.xl td{border:1px solid var(--grid);padding:3px 8px;height:24px}
+.xl thead th{background:var(--head);color:var(--muted);font:500 11px var(--nm);text-align:center}
+.xl td.rn{background:var(--head);color:var(--muted);font:11px var(--nm);text-align:center;width:28px;padding:0 4px}
+.xl td.u{color:var(--muted);font-size:12px;white-space:nowrap}
+.xl td.sec{font-family:var(--hd);font-stretch:85%;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;background:color-mix(in srgb,var(--head) 60%,var(--sheet))}
+.xl td.inp{background:var(--input-bg);padding:0;width:84px}
+.xl td.inp input{width:100%;box-sizing:border-box;border:0;background:transparent;color:var(--input);font:500 13px var(--nm);text-align:right;padding:3px 8px;height:24px}
+.kp{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));border-left:1px solid var(--grid);border-top:1px solid var(--grid)}
+.cell{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:9px 12px;display:grid;gap:1px;cursor:pointer;background:var(--sheet);text-align:left;font:inherit;color:inherit}
+.cell:hover{background:var(--head)}
+.cell.sel{box-shadow:inset 0 0 0 2px var(--sel)}
+.cell .k{font:600 11px var(--tx);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cell .v{font:500 21px var(--nm);font-variant-numeric:tabular-nums}
+.cell .n{font-size:12px;color:var(--muted)}
+.flag{font:600 11px var(--nm);padding:0 5px;border-radius:2px}
+.flag.ok{color:var(--good);background:color-mix(in srgb,var(--good) 14%,transparent)}
+.flag.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.chartwrap{border:1px solid var(--grid);padding:10px 10px 4px;overflow-x:auto}
+.lg{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap}
+.lg i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+svg text{font:10px var(--nm);fill:var(--muted)}
+/* cash flow sheet */
+table.cf{border-collapse:collapse;font:12px var(--nm);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cf th,.cf td{border:1px solid var(--grid);padding:3px 9px;text-align:right}
+.cf thead th{background:var(--head);color:var(--muted);font-weight:500}
+.cf td:first-child,.cf th:first-child{text-align:left;position:sticky;left:0;background:var(--sheet);font-family:var(--tx);font-size:13px;min-width:170px}
+.cf thead th:first-child{background:var(--head)}
+.cf tr.t td{font-weight:500;border-top:2px solid var(--fg)}
+.cf tr.t td:first-child{font-weight:600}
+.cf td.neg{color:var(--bad)}
+.dt td.h{font-weight:600;background:var(--head)}
+.dt td.base{outline:2px solid var(--fg);outline-offset:-2px}
+.note{font-size:12px;color:var(--muted);max-width:80ch;margin:0;line-height:1.5}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px}
+.cf-legend{font:11px var(--nm);color:var(--muted)}
+.cf-legend b{color:var(--input);font-weight:500}
+</style>
+
+<div class="wb"><div class="win">
+  <div class="band">
+    <div>
+      <h1>SUNFIELD SOLAR · 50 MWp · PROJECT FINANCE MODEL</h1>
+      <div class="meta"><span>GBP nominal</span><span>Sculpted senior debt</span><span>Author: K. Öznur</span></div>
+    </div>
+    <div class="scen" role="group" aria-label="Scenario">
+      <button type="button" data-s="down" aria-pressed="false">Downside</button>
+      <button type="button" data-s="base" aria-pressed="true">Base</button>
+      <button type="button" data-s="up" aria-pressed="false">Upside</button>
+    </div>
+  </div>
+  <div class="fbar"><div id="fxRef">E4</div><div class="fx">fx</div><div id="fxText"></div></div>
+
+  <div class="sheet on" id="s-dash">
+    <div class="dash">
+      <div>
+        <h2>Assumptions</h2>
+        <div class="grid"><table class="xl" id="inputs"></table></div>
+        <p class="cf-legend" style="margin-top:8px"><b>Blue</b> = hardcoded input · black = calculated</p>
+      </div>
+      <div style="display:grid;gap:18px;min-width:0">
+        <div><h2>Returns &amp; credit metrics</h2><div class="kp" id="kpis"></div></div>
+        <div>
+          <h2>CFADS split by operating year</h2>
+          <div class="chartwrap">
+            <div class="lg"><span><i style="background:var(--debt)"></i>Senior debt service</span><span><i style="background:var(--eq)"></i>Distributions to equity</span></div>
+            <div id="chart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="s-cf">
+    <h2>Annual cash flow waterfall (£k)</h2>
+    <div class="grid" id="cftable"></div>
+    <p class="note">Simplifications: no construction period or interest during construction, no DSRA, straight-line tax depreciation over the operating life, losses carried forward without limit.</p>
+  </div>
+
+  <div class="sheet" id="s-sens">
+    <div class="two">
+      <div><h2>Equity IRR tornado</h2><div class="chartwrap" id="tornado"></div><p class="note" style="margin-top:6px">±10% shock on each driver; interest rate ±100 bps.</p></div>
+      <div><h2>Data table · Equity IRR</h2><div class="grid" id="dtable"></div><p class="note" style="margin-top:6px">Rows: PPA price (£/MWh). Columns: capex (£k/MWp). Outlined cell is closest to the current case.</p></div>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-t="s-dash" aria-selected="true">Dashboard</button>
+    <button type="button" role="tab" data-t="s-cf" aria-selected="false">CF_Waterfall</button>
+    <button type="button" role="tab" data-t="s-sens" aria-selected="false">Sensitivities</button>
+  </div>
+</div></div>
+
+<script>
+// ===== MODEL START =====
+
+function irr(cfs){
+  const npv=r=>cfs.reduce((s,c,t)=>s+c/Math.pow(1+r,t),0);
+  let lo=-0.99,hi=1;
+  if(npv(lo)*npv(hi)>0) return NaN;
+  for(let i=0;i<200;i++){const m=(lo+hi)/2; if(npv(lo)*npv(m)<=0) hi=m; else lo=m;}
+  return (lo+hi)/2;
+}
+function taxSeries(taxable, rate){
+  // taxable: array of taxable profit; losses carried forward
+  let nol=0; return taxable.map(t=>{
+    let x=t; if(x<0){nol+=-x; return 0;}
+    const use=Math.min(nol,x); nol-=use; return (x-use)*rate;
+  });
+}
+function runModel(p){
+  const N=Math.max(1,Math.round(p.life)), T=Math.min(N,Math.max(1,Math.round(p.tenor)));
+  const capex=p.mw*p.capex*1000, r=p.rate/100, tx=p.tax/100;
+  const yrs=[],energy=[],price=[],rev=[],opex=[],ebitda=[],dep=[];
+  for(let y=1;y<=N;y++){
+    yrs.push(y);
+    const e=p.mw*8760*(p.cf/100)*Math.pow(1-p.deg/100,y-1);
+    const pr=p.ppa*Math.pow(1+p.esc/100,y-1);
+    const ox=p.mw*p.opex*1000*Math.pow(1+p.esc/100,y-1);
+    energy.push(e); price.push(pr); rev.push(e*pr); opex.push(ox); ebitda.push(e*pr-ox); dep.push(capex/N);
+  }
+  // Unlevered (project) cash flows
+  const unlevTax=taxSeries(ebitda.map((e,i)=>e-dep[i]),tx);
+  const projCF=[-capex,...ebitda.map((e,i)=>e-unlevTax[i])];
+  // Debt sizing with tax/interest circularity solved by iteration
+  let cfads=ebitda.map((e,i)=>e-unlevTax[i]), debt=0, ds=[], interest=[], principal=[], bal=[], tax=[];
+  for(let it=0;it<30;it++){
+    const target=cfads.map((c,i)=>i<T?Math.max(0,c)/p.dscr:0);
+    const capacity=target.reduce((s,d,i)=>s+d/Math.pow(1+r,i+1),0);
+    const newDebt=Math.min(capacity,capex*p.gear/100);
+    const k=capacity>0?newDebt/capacity:0;
+    ds=target.map(d=>d*k);
+    let b=newDebt; interest=[];principal=[];bal=[];
+    for(let i=0;i<N;i++){const int=b*r; const pr=Math.min(b,Math.max(0,ds[i]-int)); interest.push(int); principal.push(pr); b-=pr; bal.push(b);}
+    ds=interest.map((x,i)=>x+principal[i]);
+    tax=taxSeries(ebitda.map((e,i)=>e-dep[i]-interest[i]),tx);
+    const next=ebitda.map((e,i)=>e-tax[i]);
+    const conv=Math.abs(newDebt-debt)<1;
+    debt=newDebt; cfads=next; if(conv&&it>2) break;
+  }
+  const equity=capex-debt;
+  const eqCF=cfads.map((c,i)=>c-ds[i]);
+  const dscrs=cfads.map((c,i)=>ds[i]>1?c/ds[i]:null).filter(x=>x!==null);
+  const d=p.disc/100, pv=(arr)=>arr.reduce((s,x,i)=>s+x/Math.pow(1+d,i+1),0);
+  return {
+    yrs,energy,price,rev,opex,ebitda,dep,interest,principal,ds,tax,cfads,eqCF,bal,
+    capex,debt,equity,gearing:debt/capex,
+    projIRR:irr(projCF), eqIRR:irr([-equity,...eqCF]),
+    npv:-capex+pv(projCF.slice(1)),
+    lcoe:(capex+pv(opex))/pv(energy),
+    minDSCR:dscrs.length?Math.min(...dscrs):NaN,
+    avgDSCR:dscrs.length?dscrs.reduce((a,b)=>a+b,0)/dscrs.length:NaN,
+    payback:(()=>{let c=-equity;for(let i=0;i<N;i++){c+=eqCF[i];if(c>=0)return i+1;}return null;})()
+  };
+}
+
+// ===== MODEL END =====
+
+const INPUTS=[
+  ["Technical"],
+  ["mw","Installed capacity","MWp",50,1],
+  ["cf","Net capacity factor","%",11,0.1],
+  ["deg","Annual degradation","%",0.4,0.05],
+  ["life","Operating life","yrs",30,1],
+  ["Revenue & costs"],
+  ["ppa","PPA price, year 1","£/MWh",68,1],
+  ["esc","CPI indexation","% p.a.",2.5,0.1],
+  ["capex","Capex","£k/MWp",550,10],
+  ["opex","Opex, year 1","£k/MWp",12,0.5],
+  ["Financing"],
+  ["gear","Max gearing","% capex",75,1],
+  ["dscr","Target DSCR","x",1.30,0.05],
+  ["rate","All-in interest","% p.a.",6.5,0.1],
+  ["tenor","Debt tenor","yrs",18,1],
+  ["tax","Corporation tax","%",25,0.5],
+  ["disc","Discount rate","%",7.5,0.1]
+];
+const keys=INPUTS.filter(r=>r.length>1).map(r=>r[0]);
+const BASE={}; INPUTS.forEach(r=>{if(r.length>1)BASE[r[0]]=r[3];});
+const SCEN={base:{},down:{cf:10,ppa:60,capex:600,opex:13.5,rate:7.5},up:{cf:11.8,ppa:75,capex:500,opex:11,rate:6}};
+
+// build input sheet
+(function(){
+  let h='<thead><tr><th></th><th>A</th><th>B</th><th>C</th></tr></thead><tbody>'; let rn=1;
+  INPUTS.forEach(r=>{
+    if(r.length===1){h+=`<tr><td class="rn">${rn++}</td><td class="sec" colspan="3">${r[0]}</td></tr>`;return;}
+    const [id,lab,u,v,st]=r;
+    h+=`<tr><td class="rn">${rn++}</td><td><label for="${id}">${lab}</label></td><td class="u">${u}</td><td class="inp"><input id="${id}" type="number" step="${st}" value="${v}" inputmode="decimal"></td></tr>`;
+  });
+  document.getElementById("inputs").innerHTML=h+"</tbody>";
+})();
+
+const read=()=>{const p={};keys.forEach(id=>{const v=parseFloat(document.getElementById(id).value);p[id]=isFinite(v)?v:BASE[id];});if(p.dscr<=0)p.dscr=BASE.dscr;return p;};
+const pct=x=>isFinite(x)?(x*100).toFixed(1)+"%":"n/a";
+const gbpm=x=>"£"+(x/1e6).toFixed(1)+"m";
+const k=x=>{const v=Math.round(x/1000);return v<0?"("+Math.abs(v).toLocaleString("en-GB")+")":v.toLocaleString("en-GB");};
+let selKPI=0;
+
+function renderKPIs(m,p){
+  const ok=m.minDSCR>=p.dscr-0.005;
+  const items=[
+    ["E4","Equity IRR",pct(m.eqIRR),"Post-tax, nominal","=IRR(−Equity invested, Cash to equity yr 1…N)"],
+    ["E5","Project IRR",pct(m.projIRR),"Unlevered, post-tax","=IRR(−Capex, EBITDA − unlevered tax)  · financing excluded"],
+    ["E6","Project NPV",gbpm(m.npv),"@ "+p.disc+"% discount","=NPV(discount rate, unlevered cash flows) − Capex"],
+    ["E7","LCOE","£"+m.lcoe.toFixed(1),"per MWh","=(Capex + PV(opex)) ÷ PV(generation)  · price that makes project NPV zero before tax"],
+    ["E8","Senior debt",gbpm(m.debt),(m.gearing*100).toFixed(1)+"% gearing","=MIN(PV(CFADS ÷ target DSCR over tenor @ interest), Max gearing × Capex)"],
+    ["E9","Min DSCR",isFinite(m.minDSCR)?m.minDSCR.toFixed(2)+"x":"n/a",`<span class="flag ${ok?"ok":"bad"}">${ok?"≥ TARGET":"< TARGET"}</span> avg ${isFinite(m.avgDSCR)?m.avgDSCR.toFixed(2)+"x":""}`,"=MIN(CFADS ÷ debt service) over the tenor  · above target means gearing cap is binding"],
+    ["E10","Equity payback",m.payback?"Yr "+m.payback:"None",gbpm(m.equity)+" invested","=first year where cumulative cash to equity ≥ equity invested"]
+  ];
+  const box=document.getElementById("kpis");
+  box.innerHTML=items.map((it,i)=>`<button type="button" class="cell${i===selKPI?" sel":""}" data-i="${i}"><span class="k">${it[1]}</span><span class="v">${it[2]}</span><span class="n">${it[3]}</span></button>`).join("");
+  const show=i=>{selKPI=i;document.getElementById("fxRef").textContent=items[i][0];document.getElementById("fxText").textContent=items[i][4];box.querySelectorAll(".cell").forEach((c,j)=>c.classList.toggle("sel",j===i));};
+  box.querySelectorAll(".cell").forEach(c=>c.addEventListener("click",()=>show(+c.dataset.i)));
+  show(selKPI);
+}
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p;}
+function renderChart(m){
+  const N=m.yrs.length,W=Math.max(560,N*22+60),H=250,L=46,R=8,Tp=10,B=24;
+  const max=Math.max(...m.cfads,1)*1.08,step=niceStep(max/4),top=Math.ceil(max/step)*step,y=v=>Tp+(H-Tp-B)*(1-v/top),bw=(W-L-R)/N;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="CFADS split between debt service and equity">`;
+  for(let v=0;v<=top+1;v+=step)s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${(v/1e6).toFixed(1)}m</text>`;
+  m.yrs.forEach((yr,i)=>{const x=L+i*bw+1,w=bw-2,d=Math.max(0,m.ds[i]),e=Math.max(0,m.cfads[i]-d);
+    s+=`<rect x="${x}" y="${y(d)}" width="${w}" height="${y(0)-y(d)}" fill="var(--debt)"><title>Yr ${yr} debt service £${k(d)}k</title></rect>`;
+    s+=`<rect x="${x}" y="${y(d+e)}" width="${w}" height="${y(d)-y(d+e)}" fill="var(--eq)"><title>Yr ${yr} to equity £${k(e)}k</title></rect>`;
+    if(yr===1||yr%5===0)s+=`<text x="${x+w/2}" y="${H-7}" text-anchor="middle">${yr}</text>`;});
+  document.getElementById("chart").innerHTML=s+"</svg>";
+}
+function renderCF(m){
+  const N=m.yrs.length,cols=m.yrs.map(y=>`<th>${y}</th>`).join("");
+  const blank="<td></td>".repeat(N);
+  const rows=[
+    ["Generation (MWh)",m.energy.map(e=>Math.round(e).toLocaleString("en-GB"))],
+    ["PPA price (£/MWh)",m.price.map(x=>x.toFixed(1))],
+    ["Revenue",m.rev.map(k),"t"],["Opex",m.opex.map(x=>k(-x))],
+    ["EBITDA",m.ebitda.map(k),"t"],["Corporation tax",m.tax.map(x=>k(-x))],
+    ["CFADS",m.cfads.map(k),"t"],["Interest",m.interest.map(x=>k(-x))],["Principal",m.principal.map(x=>k(-x))],
+    ["DSCR",m.cfads.map((c,i)=>m.ds[i]>1?(c/m.ds[i]).toFixed(2)+"x":"–")],
+    ["Closing debt balance",m.bal.map(k)],
+    ["Cash to equity",m.eqCF.map(k),"t"]
+  ];
+  let h=`<table class="cf"><thead><tr><th>Year</th><th>0</th>${cols}</tr></thead><tbody>`;
+  h+=`<tr><td>Capex</td><td class="neg">${k(-m.capex)}</td>${blank}</tr><tr><td>Senior debt drawn</td><td>${k(m.debt)}</td>${blank}</tr><tr><td>Equity invested</td><td class="neg">${k(-m.equity)}</td>${blank}</tr>`;
+  rows.forEach(([lab,v,c])=>{h+=`<tr class="${c||""}"><td>${lab}</td><td></td>${v.map(x=>`<td class="${String(x).startsWith("(")?"neg":""}">${x}</td>`).join("")}</tr>`;});
+  document.getElementById("cftable").innerHTML=h+"</tbody></table>";
+}
+function renderTornado(p,m){
+  const vars=[["PPA price","ppa",.1,"r"],["Capacity factor","cf",.1,"r"],["Capex","capex",.1,"r"],["Opex","opex",.1,"r"],["Interest rate","rate",1,"a"]];
+  const rows=vars.map(([lab,key,d,mo])=>{const lo={...p},hi={...p};if(mo==="r"){lo[key]=p[key]*(1-d);hi[key]=p[key]*(1+d);}else{lo[key]=p[key]-d;hi[key]=p[key]+d;}return{lab,a:runModel(lo).eqIRR,b:runModel(hi).eqIRR};}).sort((x,y)=>Math.abs(y.b-y.a)-Math.abs(x.b-x.a));
+  const base=m.eqIRR,span=Math.max(...rows.flatMap(r=>[Math.abs(r.a-base),Math.abs(r.b-base)]),0.005)*1.2;
+  const W=520,L=110,R=50,rh=30,H=rows.length*rh+28,cx=L+(W-L-R)/2,sc=v=>(v-base)/span*((W-L-R)/2);
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Equity IRR tornado">`;
+  rows.forEach((r,i)=>{const yy=6+i*rh;s+=`<text x="${L-8}" y="${yy+15}" text-anchor="end" style="font:12px var(--tx);fill:var(--fg)">${r.lab}</text>`;
+    [r.a,r.b].forEach(v=>{const w=sc(v),x=w<0?cx+w:cx;s+=`<rect x="${x}" y="${yy+3}" width="${Math.abs(w)}" height="${rh-10}" fill="${v>=base?"var(--good)":"var(--bad)"}" opacity=".85"/><text x="${w<0?x-4:x+Math.abs(w)+4}" y="${yy+16}" text-anchor="${w<0?"end":"start"}">${pct(v)}</text>`;});});
+  s+=`<line x1="${cx}" x2="${cx}" y1="2" y2="${H-20}" stroke="var(--fg)"/><text x="${cx}" y="${H-5}" text-anchor="middle">Base ${pct(base)}</text>`;
+  document.getElementById("tornado").innerHTML=s+"</svg>";
+}
+function renderDT(p){
+  const ppas=[-10,-5,0,5,10].map(d=>Math.round(p.ppa+d)), cxs=[-100,-50,0,50,100].map(d=>Math.max(50,Math.round(p.capex+d)));
+  const vals=ppas.map(pp=>cxs.map(c=>runModel({...p,ppa:pp,capex:c}).eqIRR));
+  const flat=vals.flat().filter(isFinite),lo=Math.min(...flat),hi=Math.max(...flat);
+  const shade=v=>{if(!isFinite(v))return"";const t=hi>lo?(v-lo)/(hi-lo):.5;const c=t>=.5?"var(--good)":"var(--bad)";return`background:color-mix(in srgb,${c} ${Math.round(Math.abs(t-.5)*2*38)}%,transparent)`;};
+  let h=`<table class="cf dt"><thead><tr><th>PPA \\ Capex</th>${cxs.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>`;
+  ppas.forEach((pp,i)=>{h+=`<tr><td class="h">${pp}</td>${vals[i].map((v,j)=>`<td class="${i===2&&j===2?"base":""}" style="${shade(v)}">${pct(v)}</td>`).join("")}</tr>`;});
+  document.getElementById("dtable").innerHTML=h+"</tbody></table>";
+}
+function update(){const p=read(),m=runModel(p);renderKPIs(m,p);renderChart(m);renderCF(m);renderTornado(p,m);renderDT(p);}
+keys.forEach(id=>document.getElementById(id).addEventListener("input",()=>{setScen(null);update();}));
+function setScen(s){document.querySelectorAll(".scen button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.s===s)));}
+document.querySelectorAll(".scen button").forEach(b=>b.addEventListener("click",()=>{const o={...BASE,...SCEN[b.dataset.s]};keys.forEach(id=>document.getElementById(id).value=o[id]);setScen(b.dataset.s);update();}));
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
+  document.querySelectorAll(".sheet").forEach(s=>s.classList.toggle("on",s.id===b.dataset.t));}));
+update();
+</script>
